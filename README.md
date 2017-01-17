@@ -3,7 +3,6 @@
 Trustifier DFARS Compliance Kit provides a complete open-source solution to 
 complying with DFARS 253.7012 Cyber Security requirements.
 
-
 ## Important Notice for Self-Implementation
 
 Please note that while this open-source repository is the base environment that we use
