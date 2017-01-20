@@ -2,8 +2,15 @@
 
 Development notes for DFARS Compliance Kit.
 
+
+# Components
+
+## Ansible
+	
+
 # TODO
-These need to be finished 
+
+1. Set up an Ansible Framework
 
 ## SCAP Scripts
 
