@@ -1,0 +1,27 @@
+FROM centos:centos7
+
+RUN yum update -y -q ; yum clean all
+RUN yum install -y -q epel-release ; yum clean all
+RUN yum update -y -q ; yum clean all
+RUN yum -y install 	\
+	openssh-server 	\
+	passwd 		\
+	sudo		\
+	ansible		\
+	rsyslog		\
+	&&  yum clean all
+
+ADD ./id_rsa.pub /tmp
+ADD ./start.sh /srv/start.sh
+
+RUN mkdir /var/run/sshd
+
+RUN ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N ''
+
+RUN chmod a+x /srv/start.sh
+
+RUN /srv/start.sh
+
+EXPOSE 22
+
+ENTRYPOINT [ "/usr/sbin/sshd", "-D" ]
