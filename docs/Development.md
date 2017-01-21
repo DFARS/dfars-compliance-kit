@@ -6,7 +6,9 @@ Development notes for DFARS Compliance Kit.
 # Components
 
 ## Ansible
-	
+
+1. Configure a docker image for running ansible.
+
 
 # TODO
 
@@ -24,3 +26,4 @@ Development notes for DFARS Compliance Kit.
 	- RHEL 6.x / CentOS 6.x
 	- RHEL 7.x / CentOS 7.x
 	- Ubuntu 14 LTS
+
