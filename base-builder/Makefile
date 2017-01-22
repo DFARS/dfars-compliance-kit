@@ -48,24 +48,36 @@
 # @@end-help
 
 
-ROOTDIR:=.
-IMAGE:=dfars-kit/ansible
-TAG:=latest
-RUNAS:=dfars-kit-ansible
+# @@help
+# DOCKERFILE= specifies which Dockerfile to use
+# TARGET= has multiple effects
+# 	uses Dockerfile.$(TARGET) as the key docker file
+#
+# @@end-help
+#
 
-PORTS:=
+TARGET:=ansible
+DOCKERFILE:=Dockerfile$(if $(TARGET),.$(TARGET),,)
+ROOTDIR:=.
+IMAGE:=dfars-kit/$(TARGET)
+TAG:=latest
+RUNAS:=dfars-kit-$(TARGET)
+INSTANCEID:=instance-id-$(TARGET)
+
+export PORTS:=
 PORTREDIRECTS_P=$(shell echo ${PORTS} | sed 's/[0-9][0-9]*:[0-9][0-9]*/-p &/g')
+
 
 #
 # on a production system set DATADIR to /var/lib/docker-deepdive
 #
-DATADIR:=$${PWD}/data
+export DATADIR:=$${PWD}/data
 
-DATAMOUNTPOINT=/data
+export DATAMOUNTPOINT=/data
 #
 # User inside the container ... 
 #
-USERNAME=ansible
+export USERNAME:=$(TARGET)
 
 ####### do not edit below this #####
 
@@ -74,6 +86,31 @@ MAKEFLAGS += -rR --no-print-directory
 DOCKER=docker
 MKDIR_P=mkdir -p
 PERL=perl -w
+DOCKERTARGETS=$(shell echo Dockerfile.* | sed s/Dockerfile\.//g)
+
+
+DOCKERTARGETS_BUILD  := $(DOCKERTARGETS:%=%-build)
+DOCKERTARGETS_RUN    := $(DOCKERTARGETS:%=%-run)
+DOCKERTARGETS_CLEAN  := $(DOCKERTARGETS:%=%-clean)
+DOCKERTARGETS_STOP   := $(DOCKERTARGETS:%=%-stop)
+DOCKERTARGETS_START   := $(DOCKERTARGETS:%=%-start)
+
+
+
+$(DOCKERTARGETS_BUILD)::
+	$(Q)$(MAKE) TARGET=$(@:%-build=%) build
+
+$(DOCKERTARGETS_RUN)::
+	$(Q)$(MAKE) TARGET=$(@:%-run=%) run
+
+$(DOCKERTARGETS_CLEAN)::
+	$(Q)$(MAKE) TARGET=$(@:%-clean=%) clean
+
+$(DOCKERTARGETS_START)::
+	$(Q)$(MAKE) TARGET=$(@:%-start=%) start
+
+$(DOCKERTARGETS_STOP)::
+	$(Q)$(MAKE) TARGET=$(@:%-stop=%) stop
 
 # @@help verbosity
 #
@@ -119,10 +156,16 @@ PHONY=
 PHONY += default 
 
 
-default::
+default:: Dockerfile
 	@$(if $(Q),$(call e),:)
-	$(Q)$(MAKE) build  
+	$(Q)$(MAKE) build
 	@$(if $(Q),$(call e),:)
+
+
+PHONE += Dockerfile
+
+Dockerfile::
+	$(Q)(echo ; echo -e "\n\tdefault Dockerfile does not exist, use one of the following targets\n\t\t$(DOCKERTARGETS)\n") 1>&2 && false
 
 PHONY += help
 help::
@@ -137,21 +180,21 @@ PHONY+=space
 PHONY+= build
 
 build: 
-	$(Q)$(call S, DOCKER BUILD, $(DOCKER) build -t $(IMAGE):$(TAG) $(ROOTDIR), build-log ) || \
+	$(Q)$(call S, DOCKER BUILD, $(DOCKER) build -f '$(DOCKERFILE)' -t $(IMAGE):$(TAG) $(ROOTDIR), build-log ) || \
 		$(call T, Error: docker build log, tac build-log | grep -m1 Step -B10 | tac)
 
 PHONY+=run
-run: 
-	$(Q)$(call e); $(MAKE) build clean-instance run-instance; $(call e)
+run:
+	$(Q)$(call e); $(MAKE) DOCKERFILE=$(DOCKERFILE) TARGET=$(TARGET) build clean-instance run-instance; $(call e)
 
 stop:
-	$(Q)$(call e); $(MAKE) stop-instance; $(call e)
+	$(Q)$(call e); $(MAKE) DOCKERFILE=$(DOCKERFILE) TARGET=$(TARGET) stop-instance; $(call e)
 
 start:
-	$(Q)$(call e); $(MAKE) start-instance; $(call e)
+	$(Q)$(call e); $(MAKE) DOCKERFILE=$(DOCKERFILE) TARGET=$(TARGET) start-instance; $(call e)
 
 clean:
-	$(Q)$(call e); $(MAKE) stop-instance clean-instance; $(call e)
+	$(Q)$(call e); $(MAKE) DOCKERFILE=$(DOCKERFILE) TARGET=$(TARGET) stop-instance clean-instance; $(call e)
 
 status:
 	$(Q)INSTANCEID="$$($(DOCKER) ps -q -f 'name=$(RUNAS)')";  test -n "$${INSTANCEID}" && \
@@ -162,7 +205,7 @@ run-instance:
 		( echo "Please remove the instance before issuing make run" 1>&2 && exit 127 )
 	$(Q)$(call S, CREATING DATA DIR $(DATADIR), mkdir -p $(DATADIR))
 	$(Q)$(call S, DOCKER RUN $(RUNAS), \
-		$(DOCKER) run -v $(DATADIR):$(DATAMOUNTPOINT) ${PORTREDIRECTS_P} -tid --name $(RUNAS) $(IMAGE):$(TAG), instance-id) \
+		$(DOCKER) run -v $(DATADIR):$(DATAMOUNTPOINT) ${PORTREDIRECTS_P} -tid --name $(RUNAS) $(IMAGE):$(TAG), $(INSTANCEID)) \
 	 && $(call S, $(RUNAS) is running)
 	$(MAKE) attach-help
 
@@ -170,10 +213,10 @@ run-instance:
 clean-instance:
 	$(Q)test -z "$$($(DOCKER) ps -q -f 'name=$(RUNAS)')" || \
 		( echo "Please stop the instance before issuing make clean-instance" 1>&2 && exit 127 )
-	$(Q)$(call S, 'DOCKER CLEAN', $(DOCKER) rm $(RUNAS) || echo $(RUNAS), instance-id )
+	$(Q)$(call S, 'DOCKER CLEAN', $(DOCKER) rm $(RUNAS) || echo $(RUNAS), $(INSTANCEID) )
 
 start-instance:
-	$(Q)$(call S, 'DOCKER START', $(DOCKER) start $(RUNAS), instance-id)
+	$(Q)$(call S, 'DOCKER START', $(DOCKER) start $(RUNAS), $(INSTANCEID))
 
 stop-instance:
 	$(Q)test -n "$$($(DOCKER) ps -q -f 'name=$(RUNAS)')" && $(call S, 'DOCKER STOP', $(DOCKER) stop $(RUNAS)) || true
@@ -187,7 +230,21 @@ attach-help:
 .deps:
 	$(Q)$(MKDIR_P) $@
 
+PHONE+=first-time-help
+
 first-time-help:
 	$(Q)test -f .deps/first-time-help || ($(MAKE) help && mkdir .deps && touch .deps/first-time-help)
+
+PHONE+=list-targets
+
+list-targets:
+	$(Q)echo $(DOCKERTARGETS)
+
+PHONE += $(DOCKERTARGETS)
+
+# build and run targets for various Dockerfile.* 
+#
+# $(DOCKERTARGETS):
+#	$(Q)$(MAKE) DOCKERFILE=Dockerfile.$@ TARGET=$@ build
 
 .PHONY: $(PHONY)
