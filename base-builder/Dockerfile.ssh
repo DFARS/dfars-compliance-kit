@@ -1,0 +1,36 @@
+FROM centos:centos7
+
+LABEL 	author.FullName="Ahmed Masud" 		  \
+	author.email="ahmed.masud@trustifier.com" \
+	version="v1.0.0"			  \
+	description="SSH Enabled CENTOS-7 environment"
+
+RUN yum update -y -q ; yum clean all
+RUN yum install -y -q epel-release ; yum clean all
+RUN yum update -y -q ; yum clean all
+RUN yum -y install 	\
+	openssh-server 	\
+	passwd 		\
+	sudo		\
+	rsyslog		\
+	&&  yum clean all
+
+ADD ./id_rsa.pub /tmp
+ADD ./start.sh /srv/start.sh
+ADD ./cleanup-baseimage-artifacts.sh /srv/cleanup-baseimage-artifacts.sh
+
+RUN mkdir /var/run/sshd
+
+RUN ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N ''
+
+RUN chmod a+x /srv/start.sh /srv/cleanup-baseimage-artifacts.sh
+
+ARG USERNAME
+ENV USERNAME ${USERNAME:-user}
+RUN /srv/start.sh ${USERNAME}
+
+EXPOSE 22
+
+ONBUILD RUN /srv/cleanup-baseimage-artifacts.sh ${USERNAME}
+
+ENTRYPOINT [ "/usr/sbin/sshd", "-D" ]
