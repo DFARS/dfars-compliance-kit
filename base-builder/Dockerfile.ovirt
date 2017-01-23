@@ -1,9 +1,11 @@
 FROM dfars-kit/ansible
 MAINTAINER Ahmed Masud <ahmed.masud@trustifier.com>
 
+ENV USERNAME ovirt
+
+ADD ./id_rsa.pub /tmp
+RUN /srv/start.sh ${USERNAME}
+
 RUN yum update -y && yum clean all
 RUN yum install -y  http://resources.ovirt.org/pub/yum-repo/ovirt-release40.rpm
 RUN yum install -y  ovirt-engine
-
-
-ENTRYPOINT [ "/usr/sbin/sshd", "-D" ]
