@@ -94,8 +94,13 @@ DOCKERTARGETS_RUN    := $(DOCKERTARGETS:%=%-run)
 DOCKERTARGETS_CLEAN  := $(DOCKERTARGETS:%=%-clean)
 DOCKERTARGETS_STOP   := $(DOCKERTARGETS:%=%-stop)
 DOCKERTARGETS_START   := $(DOCKERTARGETS:%=%-start)
+IPOF := $(DOCKERTARGETS:%=%-ip)
 
 
+default::
+	@$(if $(Q),$(call e),:)
+	$(Q)$(MAKE) list-targets
+	@$(if $(Q),$(call e),:)
 
 $(DOCKERTARGETS_BUILD)::
 	$(Q)$(MAKE) TARGET=$(@:%-build=%) build
@@ -111,6 +116,9 @@ $(DOCKERTARGETS_START)::
 
 $(DOCKERTARGETS_STOP)::
 	$(Q)$(MAKE) TARGET=$(@:%-stop=%) stop
+
+$(IPOF)::
+	$(Q)$(MAKE) TARGET=$(@:%-ip=%) ip
 
 # @@help verbosity
 #
@@ -156,10 +164,6 @@ PHONY=
 PHONY += default 
 
 
-default:: Dockerfile
-	@$(if $(Q),$(call e),:)
-	$(Q)$(MAKE) build
-	@$(if $(Q),$(call e),:)
 
 
 PHONE += Dockerfile
@@ -227,6 +231,9 @@ attach-help:
 	@echo -e "\n\n	Use \e[1mdocker exec -ti $(RUNAS) su - $(USERNAME)\e[0m to attach to the environment.\n"
 	@echo -e "\n\n	Use \e[1mdocker exec -ti $(RUNAS) /bin/bash\e[0m to attach to the raw instance.\n"
 
+ip:
+	$(Q)docker exec -ti $(RUNAS) /usr/sbin/ip addr
+
 .deps:
 	$(Q)$(MKDIR_P) $@
 
@@ -238,7 +245,13 @@ first-time-help:
 PHONE+=list-targets
 
 list-targets:
-	$(Q)echo $(DOCKERTARGETS)
+	@echo -ne "\nYou need to specify a Docker target, following targets are available:\n\n" \
+		"\tBuild Targets: \e[1m" $(DOCKERTARGETS_BUILD) "\e[0m\n"	\
+		"\tClean Targets: \e[1m" $(DOCKERTARGETS_CLEAN) "\e[0m\n"	\
+		"\tRun Targets: \e[1m" $(DOCKERTARGETS_RUN) "\e[0m\n"	\
+		"\tStart a particular instance: \e[1m" $(DOCKERTARGETS_START) "\e[0m\n"	\
+		"\tStop a particular instance: \e[1m" $(DOCKERTARGETS_STOP) "\e[0m\n"	\
+		""
 
 PHONE += $(DOCKERTARGETS)
 
